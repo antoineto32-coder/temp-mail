@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#09090b" />
+  <title>TempMail — Wegwerf-E-Mail</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    .glass { background: rgba(24,24,27,.82); backdrop-filter: blur(16px); }
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid #3f3f46; border-top-color: #a78bfa;
+      border-radius: 50%; animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .mail-row { transition: background .15s, border-color .15s; }
+    .mail-row:hover { background: #27272a; }
+    button:focus-visible, input:focus-visible {
+      outline: 2px solid #a78bfa; outline-offset: 3px;
+    }
+    #messageFrame { width: 100%; min-height: 300px; border: 0; background: white; }
+    .scrollbar::-webkit-scrollbar { width: 6px; }
+    .scrollbar::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 9px; }
+  </style>
+</head>
+
+<body class="min-h-screen bg-zinc-950 text-zinc-100 selection:bg-violet-500/30">
+  <div class="fixed inset-0 pointer-events-none overflow-hidden">
+    <div class="absolute -top-40 left-1/3 h-96 w-96 rounded-full bg-violet-700/10 blur-3xl"></div>
+    <div class="absolute top-1/2 -right-40 h-96 w-96 rounded-full bg-indigo-700/10 blur-3xl"></div>
+  </div>
+
+  <main class="relative mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
+    <header class="mb-10 flex items-center justify-between">
+      <a href="#" class="flex items-center gap-3" aria-label="TempMail Startseite">
+        <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-500/15 text-violet-300 ring-1 ring-violet-400/20">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="3" y="5" width="18" height="14" rx="3"/>
+            <path d="m4 7 8 6 8-6"/>
+          </svg>
+        </div>
+        <div>
+          <div class="text-lg font-bold tracking-tight">TempMail<span class="text-violet-400">.</span></div>
+          <div class="text-xs text-zinc-500">Private Inbox · Wegwerf-E-Mail</div>
+        </div>
+      </a>
+      <div class="flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/80 px-3 py-2 text-xs text-zinc-400">
+        <span id="statusDot" class="h-2 w-2 rounded-full bg-zinc-500"></span>
+        <span id="statusText">Verbindung wird aufgebaut</span>
+      </div>
+    </header>
+
+    <section class="mb-8">
+      <div class="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[.2em] text-violet-300">
+        <span class="h-px w-6 bg-violet-400"></span>
+        Deine temporäre Inbox
+      </div>
+      <h1 class="mb-3 text-3xl font-bold tracking-tight sm:text-5xl">
+        Deine E-Mail.<br class="sm:hidden" />
+        <span class="text-zinc-500">Ohne Verpflichtungen.</span>
+      </h1>
+      <p class="max-w-xl text-sm leading-6 text-zinc-400 sm:text-base">
+        Eine temporäre Adresse, sofort einsatzbereit. Empfange E-Mails direkt in deinem Browser – ohne ein persönliches Postfach anzulegen.
+      </p>
+    </section>
+
+    <section class="glass mb-6 rounded-3xl border border-zinc-800 p-5 shadow-2xl shadow-black/20 sm:p-7">
+      <div class="mb-5 flex items-center justify-between">
+        <div class="text-sm font-medium text-zinc-300">Deine E-Mail-Adresse</div>
+        <span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-300">
+          <span class="mr-1">●</span> Temporär
+        </span>
+      </div>
+
+      <div class="flex flex-col gap-3 sm:flex-row">
+        <div class="flex min-w-0 flex-1 items-center rounded-2xl border border-zinc-700 bg-zinc-950/80 px-4 py-4">
+          <svg class="mr-3 shrink-0 text-violet-400" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="3" y="5" width="18" height="14" rx="3"/>
+            <path d="m4 7 8 6 8-6"/>
+          </svg>
+          <div id="address" class="min-w-0 flex-1 break-all font-mono text-sm text-zinc-300 sm:text-base" aria-live="polite">
+            Adresse wird erstellt …
+          </div>
+          <button id="copyBtn" disabled class="ml-3 shrink-0 rounded-xl bg-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-300 transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40">
+            Kopieren
+          </button>
+        </div>
+        <button id="newBtn" class="flex items-center justify-center gap-2 rounded-2xl bg-violet-500 px-5 py-4 text-sm font-semibold text-white shadow-lg shadow-violet-950/30 transition hover:bg-violet-400 disabled:cursor-not-allowed disabled:opacity-50">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 7v5h-5M4 17v-5h5"/>
+            <path d="M5.6 9A7 7 0 0 1 18 6l2 6M4 12l2 6a7 7 0 0 0 12.4-3"/>
+          </svg>
+          Neue Adresse
+        </button>
+      </div>
+
+      <div class="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-500">
+        <span id="accountInfo">Wird mit Mail.tm verbunden …</span>
+        <span>Automatische Aktualisierung: 5 Sekunden</span>
+      </div>
+    </section>
+
+    <section class="overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-900/70">
+      <div class="flex flex-col gap-4 border-b border-zinc-800 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+        <div class="flex items-center gap-3">
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-800 text-violet-300">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M4 4h16v16H4z"/><path d="M4 7l8 6 8-6"/>
+            </svg>
+          </div>
+          <div>
+            <h2 class="font-semibold">Posteingang</h2>
+            <p id="mailCount" class="mt-0.5 text-xs text-zinc-500">0 Nachrichten</p>
+          </div>
+        </div>
+        <button id="refreshBtn" disabled class="flex items-center justify-center gap-2 self-start rounded-xl border border-zinc-700 px-4 py-2.5 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 disabled:opacity-40 sm:self-auto">
+          <svg id="refreshIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.6 9A7 7 0 0 1 18 6l2 6M4 12l2 6a7 7 0 0 0 12.4-3"/>
+          </svg>
+          Aktualisieren
+        </button>
+      </div>
+
+      <div id="errorBox" role="alert" class="hidden border-b border-red-900/50 bg-red-950/30 px-5 py-3 text-sm text-red-300"></div>
+
+      <div id="loadingState" class="flex flex-col items-center justify-center px-6 py-16 text-center">
+        <div class="spinner mb-4"></div>
+        <p id="loadingTitle" class="text-sm font-medium text-zinc-300">Warte auf eingehende E-Mails...</p>
+        <p id="loadingDescription" class="mt-2 max-w-sm text-xs leading-5 text-zinc-500">Dein Postfach wird eingerichtet. Eingehende Nachrichten erscheinen automatisch hier.</p>
+      </div>
+
+      <div id="mailList" class="scrollbar hidden max-h-[600px] divide-y divide-zinc-800 overflow-y-auto"></div>
+
+      <div id="emptyState" class="hidden flex-col items-center justify-center px-6 py-16 text-center">
+        <div class="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-950 text-zinc-600">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="5" width="18" height="14" rx="3"/>
+            <path d="m4 7 8 6 8-6"/>
+            <path d="M12 3v2m7-1-1 2"/>
+          </svg>
+        </div>
+        <p class="font-medium text-zinc-300">Dein Posteingang ist noch leer</p>
+        <p class="mt-2 max-w-xs text-sm leading-6 text-zinc-500">Wir prüfen automatisch alle 5 Sekunden auf neue Nachrichten. Du kannst diese Seite geöffnet lassen.</p>
+        <div class="mt-5 flex items-center gap-2 text-xs text-zinc-600">
+          <span class="spinner !h-3 !w-3 !border-[1.5px]"></span>
+          Warte auf eingehende E-Mails...
+        </div>
+      </div>
+    </section>
+
+    <footer class="mt-8 flex flex-col gap-3 border-t border-zinc-900 pt-5 text-xs leading-5 text-zinc-600 sm:flex-row sm:items-center sm:justify-between">
+      <span>Bereitgestellt über die öffentliche Mail.tm API.</span>
+      <span>Keine sensiblen Daten über temporäre Postfächer empfangen.</span>
+    </footer>
+  </main>
+
+  <!-- Dialog für den Inhalt einer E-Mail -->
+  <div id="messageModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 p-3 backdrop-blur-sm sm:p-6" role="dialog" aria-modal="true" aria-labelledby="modalSubject">
+    <div class="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl">
+      <div class="flex items-start justify-between gap-4 border-b border-zinc-800 p-5">
+        <div class="min-w-0">
+          <p class="mb-2 text-xs uppercase tracking-widest text-violet-300">Nachricht</p>
+          <h3 id="modalSubject" class="break-words text-lg font-semibold">E-Mail</h3>
+          <p id="modalFrom" class="mt-2 break-all text-xs text-zinc-400"></p>
+          <p id="modalDate" class="mt-1 text-xs text-zinc-500"></p>
+        </div>
+        <button id="closeModal" class="shrink-0 rounded-lg p-2 text-zinc-400 hover:bg-zinc-800 hover:text-white" aria-label="Nachricht schließen">✕</button>
+      </div>
+      <div id="messageLoading" class="hidden items-center gap-3 p-8 text-sm text-zinc-400">
+        <div class="spinner"></div> Nachricht wird geladen …
+      </div>
+      <div id="messageError" class="hidden p-5 text-sm text-red-300" role="alert"></div>
+      <div id="messageContent" class="scrollbar min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+        <pre id="messageText" class="whitespace-pre-wrap break-words font-sans text-sm leading-6 text-zinc-300"></pre>
+        <div id="htmlContainer" class="mt-5 hidden overflow-hidden rounded-lg bg-white">
+          <iframe id="messageFrame" title="HTML-Inhalt der E-Mail" sandbox="" referrerpolicy="no-referrer"></iframe>
+        </div>
+      </div>
+      <div class="border-t border-zinc-800 px-5 py-3 text-xs text-zinc-500">
+        HTML-Inhalt wird isoliert angezeigt. Externe Ressourcen sind blockiert.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const API = "https://api.mail.tm";
+      const REFRESH_MS = 5000;
+
+      const $ = (id) => document.getElementById(id);
+
+      const els = {
+        address: $("address"),
+        copy: $("copyBtn"),
+        new: $("newBtn"),
+        refresh: $("refreshBtn"),
+        refreshIcon: $("refreshIcon"),
+        statusDot: $("statusDot"),
+        status: $("statusText"),
+        accountInfo: $("accountInfo"),
+        count: $("mailCount"),
+        loading: $("loadingState"),
+        loadingTitle: $("loadingTitle"),
+        loadingDescription: $("loadingDescription"),
+        list: $("mailList"),
+        empty: $("emptyState"),
+        error: $("errorBox"),
+        modal: $("messageModal"),
+        modalSubject: $("modalSubject"),
+        modalFrom: $("modalFrom"),
+        modalDate: $("modalDate"),
+        messageLoading: $("messageLoading"),
+        messageError: $("messageError"),
+        messageContent: $("messageContent"),
+        messageText: $("messageText"),
+        htmlContainer: $("htmlContainer"),
+        frame: $("messageFrame")
+      };
+
+      let account = null;
+      let token = null;
+      let activeDomain = null;
+      let refreshTimer = null;
+      let refreshing = false;
+      let creating = false;
+      let lastMessages = [];
+      let generation = 0;
+      let lastFocusedElement = null;
+
+      function setStatus(text, color = "green") {
+        els.status.textContent = text;
+        const colors = {
+          green: "bg-emerald-400",
+          yellow: "bg-amber-400",
+          red: "bg-red-400",
+          gray: "bg-zinc-500"
+        };
+        els.statusDot.className = "h-2 w-2 rounded-full " + (colors[color] || colors.gray);
+      }
+
+      function showError(message) {
+        els.error.textContent = message;
+        els.error.classList.remove("hidden");
+      }
+
+      function hideError() {
+        els.error.textContent = "";
+        els.error.classList.add("hidden");
+      }
+
+      function setLoading(visible, title, description) {
+        els.loading.classList.toggle("hidden", !visible);
+        if (title) els.loadingTitle.textContent = title;
+        if (description) els.loadingDescription.textContent = description;
+      }
+
+      async function api(path, options = {}, auth = false) {
+        const headers = new Headers(options.headers || {});
+        headers.set("Accept", "application/json");
+
+        if (options.body && !headers.has("Content-Type")) {
+          headers.set("Content-Type", "application/json");
+        }
+
+        if (auth) {
+          if (!token) throw new Error("Es ist kein gültiger Sitzungstoken vorhanden.");
+          headers.set("Authorization", "Bearer " + token);
+        }
+
+        const response = await fetch(API + path, {
+          ...options,
+          headers,
+          cache: "no-store"
+        });
+
+        if (!response.ok) {
+          let detail = "";
+          try {
+            const body = await response.json();
+            detail = body["hydra:description"] || body.detail || body.message || "";
+          } catch (_) {}
+
+          const error = new Error(
+            detail || `API-Fehler (${response.status} ${response.statusText})`
+          );
+          error.status = response.status;
+          throw error;
+        }
+
+        if (response.status === 204) return null;
+        return response.json();
+      }
+
+      function randomString(length) {
+        const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
+        const bytes = new Uint8Array(length);
+        crypto.getRandomValues(bytes);
+        return Array.from(bytes, b => alphabet[b % alphabet.length]).join("");
+      }
+
+      function createPassword() {
+        const bytes = new Uint8Array(24);
+        crypto.getRandomValues(bytes);
+        return Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
+      }
+
+      function messageArray(data) {
+        if (Array.isArray(data)) return data;
+        if (Array.isArray(data["hydra:member"])) return data["hydra:member"];
+        return [];
+      }
+
+      function formatDate(dateValue) {
+        if (!dateValue) return "Datum unbekannt";
+        const date = new Date(dateValue);
+        if (Number.isNaN(date.getTime())) return "Datum unbekannt";
+        return new Intl.DateTimeFormat("de-DE", {
+          dateStyle: "medium",
+          timeStyle: "short"
+        }).format(date);
+      }
+
+      function senderName(message) {
+        const from = message.from;
+        if (from && typeof from === "object") {
+          return from.name ? `${from.name} <${from.address || ""}>` : (from.address || "Unbekannter Absender");
+        }
+        return typeof from === "string" ? from : "Unbekannter Absender";
+      }
+
+      function senderAddress(message) {
+        const from = message.from;
+        if (from && typeof from === "object") return from.address || "";
+        return typeof from === "string" ? from : "";
+      }
+
+      function clearMailboxUI() {
+        lastMessages = [];
+        els.list.replaceChildren();
+        els.list.classList.add("hidden");
+        els.empty.classList.add("hidden");
+        els.count.textContent = "0 Nachrichten";
+        setLoading(true, "Warte auf eingehende E-Mails...", "Dein Postfach wird eingerichtet. Eingehende Nachrichten erscheinen automatisch hier.");
+      }
+
+      async function createMailbox() {
+        if (creating) return;
+        creating = true;
+
+        const thisGeneration = ++generation;
+        clearInterval(refreshTimer);
+        refreshTimer = null;
+        token = null;
+        account = null;
+        activeDomain = null;
+        hideError();
+        clearMailboxUI();
+
+        els.new.disabled = true;
+        els.copy.disabled = true;
+        els.refresh.disabled = true;
+        els.address.textContent = "Adresse wird erstellt …";
+        els.accountInfo.textContent = "Verbindung mit Mail.tm …";
+        setStatus("Verbindung wird aufgebaut", "yellow");
+
+        try {
+          // 1. Aktive Domain aus der echten Mail.tm API laden.
+          const domainsResponse = await api("/domains");
+          if (thisGeneration !== generation) return;
+
+          const domains = messageArray(domainsResponse);
+          const domainEntry = domains.find(d => d.isActive && d.isPrivate === false)
+            || domains.find(d => d.isActive);
+
+          if (!domainEntry || !domainEntry.domain) {
+            throw new Error("Mail.tm stellt derzeit keine aktive Domain bereit.");
+          }
+
+          activeDomain = domainEntry.domain;
+
+          // 2. Konto mit zufälliger Adresse und starkem Passwort registrieren.
+          // Bei einem seltenen Namenskonflikt wird eine neue Adresse versucht.
+          let created = false;
+          let lastCreateError = null;
+
+          for (let attempt = 0; attempt < 4; attempt++) {
+            const address = `inbox${randomString(12)}@${activeDomain}`;
+            const password = createPassword();
+
+            try {
+              await api("/accounts", {
+                method: "POST",
+                body: JSON.stringify({ address, password })
+              });
+
+              account = { address, password };
+              created = true;
+              break;
+            } catch (error) {
+              lastCreateError = error;
+              if (error.status !== 422 && error.status !== 409) throw error;
+            }
+          }
+
+          if (!created) {
+            throw lastCreateError || new Error("Das Konto konnte nicht erstellt werden.");
+          }
+
+          if (thisGeneration !== generation) return;
+
+          // 3. Bearer-Token abrufen.
+          const tokenResponse = await api("/token", {
+            method: "POST",
+            body: JSON.stringify({
+              address: account.address,
+              password: account.password
+            })
+          });
+
+          if (thisGeneration !== generation) return;
+          if (!tokenResponse.token) {
+            throw new Error("Mail.tm hat keinen Sitzungstoken zurückgegeben.");
+          }
+
+          token = tokenResponse.token;
+          els.address.textContent = account.address;
+          els.copy.disabled = false;
+          els.refresh.disabled = false;
+          els.accountInfo.textContent = `Aktive Domain: ${activeDomain}`;
+          setStatus("Postfach aktiv", "green");
+          hideError();
+
+          // 4. Erste Abfrage direkt ausführen, danach alle 5 Sekunden.
+          await refreshInbox(thisGeneration);
+          if (thisGeneration !== generation) return;
+
+          refreshTimer = setInterval(() => {
+            refreshInbox(thisGeneration);
+          }, REFRESH_MS);
+
+        } catch (error) {
+          if (thisGeneration !== generation) return;
+
+          console.error("TempMail Kontoerstellung fehlgeschlagen:", error);
+          setStatus("Verbindung fehlgeschlagen", "red");
+          els.accountInfo.textContent = "Die Verbindung konnte nicht hergestellt werden.";
+          setLoading(true, "Postfach nicht verfügbar", "Überprüfe deine Verbindung und versuche es erneut.");
+          showError(error.message || "Mail.tm ist vorübergehend nicht erreichbar. Bitte versuche es erneut.");
+        } finally {
+          if (thisGeneration === generation) {
+            creating = false;
+            els.new.disabled = false;
+          }
+        }
+      }
+
+      function renderInbox(messages) {
+        const sorted = [...messages].sort((a, b) => {
+          return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+        });
+
+        const previousIds = new Set(lastMessages.map(m => m.id));
+        const incomingIds = new Set(sorted.map(m => m.id));
+        const isFirstLoad = lastMessages.length === 0;
+        const hasNew = !isFirstLoad && sorted.some(m => !previousIds.has(m.id));
+
+        lastMessages = sorted;
+        els.count.textContent = `${sorted.length} ${sorted.length === 1 ? "Nachricht" : "Nachrichten"}`;
+        setLoading(false);
+
+        if (sorted.length === 0) {
+          els.list.classList.add("hidden");
+          els.empty.classList.remove("hidden");
+          els.empty.classList.add("flex");
+          return;
+        }
+
+        els.empty.classList.add("hidden");
+        els.empty.classList.remove("flex");
+        els.list.classList.remove("hidden");
+
+        const fragment = document.createDocumentFragment();
+
+        for (const message of sorted) {
+          const row = document.createElement("button");
+          row.type = "button";
+          row.className = "mail-row flex w-full items-start gap-4 px-5 py-5 text-left sm:px-7";
+          row.setAttribute("aria-label", `E-Mail öffnen: ${message.subject || "Ohne Betreff"}`);
+
+          const unread = message.seen === false;
+          const dot = document.createElement("span");
+          dot.className = `mt-2 h-2 w-2 shrink-0 rounded-full ${unread ? "bg-violet-400" : "bg-zinc-700"}`;
+
+          const main = document.createElement("div");
+          main.className = "min-w-0 flex-1";
+
+          const top = document.createElement("div");
+          top.className = "flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between";
+
+          const subject = document.createElement("span");
+          subject.className = `break-words text-sm ${unread ? "font-semibold text-white" : "font-medium text-zinc-300"}`;
+          subject.textContent = message.subject || "(Kein Betreff)";
+
+          const date = document.createElement("span");
+          date.className = "shrink-0 text-xs text-zinc-500";
+          date.textContent = formatDate(message.createdAt);
+
+          const sender = document.createElement("p");
+          sender.className = "mt-2 truncate text-xs text-zinc-400";
+          sender.textContent = senderName(message);
+
+          const intro = document.createElement("p");
+          intro.className = "mt-2 line-clamp-2 break-words text-sm leading-6 text-zinc-500";
+          intro.textContent = message.intro || "Öffnen, um die Nachricht zu lesen.";
+
+          top.append(subject, date);
+          main.append(top, sender, intro);
+          row.append(dot, main);
+
+          row.addEventListener("click", () => openMessage(message.id));
+          fragment.append(row);
+        }
+
+        els.list.replaceChildren(fragment);
+
+        if (hasNew) {
+          setStatus("Neue E-Mail empfangen", "green");
+        }
+      }
+
+      async function refreshInbox(expectedGeneration = generation) {
+        if (refreshing || !token || expectedGeneration !== generation) return;
+        refreshing = true;
+
+        els.refresh.disabled = true;
+        els.refreshIcon.classList.add("animate-spin");
+
+        try {
+          // 4. Abruf des echten Posteingangs mit Bearer-Token.
+          const response = await api("/messages?page=1", {}, true);
+          if (expectedGeneration !== generation) return;
+
+          const messages = messageArray(response);
+          renderInbox(messages);
+          hideError();
+
+          if (els.status.textContent !== "Neue E-Mail empfangen") {
+            setStatus("Live verbunden", "green");
+          }
+
+        } catch (error) {
+          if (expectedGeneration !== generation) return;
+          console.error("Posteingang konnte nicht geladen werden:", error);
+
+          if (error.status === 401 || error.status === 403) {
+            setStatus("Authentifizierung fehlgeschlagen", "red");
+            showError("Dein Sitzungstoken ist ungültig oder abgelaufen. Erstelle bitte eine neue Adresse.");
+          } else {
+            setStatus("Verbindungsproblem", "yellow");
+            showError("Der Posteingang konnte gerade nicht aktualisiert werden. Wir versuchen es automatisch erneut.");
+          }
+
+          if (lastMessages.length === 0) {
+            setLoading(true, "Verbindung wird erneut versucht …", "Bitte warte einen Moment oder nutze den Aktualisieren-Button.");
+          }
+        } finally {
+          if (expectedGeneration === generation) {
+            refreshing = false;
+            els.refresh.disabled = !token;
+            els.refreshIcon.classList.remove("animate-spin");
+          }
+        }
+      }
+
+      // Entfernt aktive Inhalte und riskante URLs aus fremdem E-Mail-HTML.
+      // Zusätzlich wird der verbleibende Inhalt in einem Sandbox-iframe
+      // mit restriktiver Content Security Policy ausgegeben.
+      function sanitizeEmailHtml(html) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(String(html || ""), "text/html");
+
+        doc.querySelectorAll(
+          "script, noscript, object, embed, applet, form, input, button, textarea, select, meta[http-equiv], base, link, iframe, frame, frameset, portal"
+        ).forEach(node => node.remove());
+
+        const allowedUrl = (value, attribute) => {
+          const v = String(value || "").trim();
+          if (!v) return false;
+
+          if (/^(javascript|vbscript|file|blob):/i.test(v)) return false;
+          if (/^data:/i.test(v)) return attribute === "src" && /^data:image\/(?:png|gif|jpeg|webp);base64,/i.test(v);
+          if (/^https?:\/\//i.test(v)) return false; // Externe Ressourcen und Links deaktiviert.
+          if (/^(mailto|tel):/i.test(v)) return false;
+          if (/^\/\//.test(v)) return false;
+
+          return /^(#|\/|\.\/|\.\.\/)/.test(v);
+        };
+
+        doc.querySelectorAll("*").forEach(element => {
+          for (const attr of Array.from(element.attributes)) {
+            const name = attr.name.toLowerCase();
+            const value = attr.value;
+
+            if (
+              name.startsWith("on") ||
+              name === "srcdoc" ||
+              name === "srcset" ||
+              name === "formaction" ||
+              name === "action" ||
+              name === "xlink:href"
+            ) {
+              element.removeAttribute(attr.name);
+              continue;
+            }
+
+            if (["href", "src", "poster", "background"].includes(name)) {
+              if (!allowedUrl(value, name)) element.removeAttribute(attr.name);
+            }
+
+            if (name === "style" && /url\s*\(|expression\s*\(|@import/i.test(value)) {
+              element.removeAttribute(attr.name);
+            }
+          }
+
+          if (element.tagName === "A") {
+            element.removeAttribute("href");
+            element.removeAttribute("target");
+          }
+        });
+
+        const head = doc.head || doc.createElement("head");
+        const body = doc.body || doc.createElement("body");
+
+        // Zusätzliche CSP als zweite Schutzschicht.
+        const csp = doc.createElement("meta");
+        csp.httpEquiv = "Content-Security-Policy";
+        csp.content = "default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:; media-src 'none'; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-src 'none'; object-src 'none'";
+        head.prepend(csp);
+
+        return "<!DOCTYPE html><html><head><meta charset=\"utf-8\">" +
+          head.innerHTML + "</head><body>" + body.innerHTML + "</body></html>";
+      }
+
+      async function openMessage(id) {
+        if (!token || !id) return;
+
+        lastFocusedElement = document.activeElement;
+        els.modal.classList.remove("hidden");
+        els.modal.classList.add("flex");
+        els.modalSubject.textContent = "Nachricht wird geladen …";
+        els.modalFrom.textContent = "";
+        els.modalDate.textContent = "";
+        els.messageText.textContent = "";
+        els.htmlContainer.classList.add("hidden");
+        els.messageError.classList.add("hidden");
+        els.messageLoading.classList.remove("hidden");
+        els.messageLoading.classList.add("flex");
+        els.messageContent.classList.add("hidden");
+
+        try {
+          // 5. Vollständige Nachricht direkt von Mail.tm laden.
+          const message = await api("/messages/" + encodeURIComponent(id), {}, true);
+
+          els.modalSubject.textContent = message.subject || "(Kein Betreff)";
+          els.modalFrom.textContent = "Von: " + senderName(message);
+          els.modalDate.textContent = formatDate(message.createdAt);
+
+          if (message.text) {
+            els.messageText.textContent = Array.isArray(message.text)
+              ? message.text.join("\n")
+              : String(message.text);
+          } else {
+            els.messageText.textContent = "Kein Textinhalt vorhanden.";
+          }
+
+          const htmlContent = Array.isArray(message.html)
+            ? message.html.join("\n")
+            : (typeof message.html === "string" ? message.html : "");
+
+          if (htmlContent.trim()) {
+            els.frame.srcdoc = sanitizeEmailHtml(htmlContent);
+            els.htmlContainer.classList.remove("hidden");
+          } else {
+            els.frame.srcdoc = "";
+          }
+
+          els.messageLoading.classList.add("hidden");
+          els.messageLoading.classList.remove("flex");
+          els.messageContent.classList.remove("hidden");
+
+        } catch (error) {
+          console.error("E-Mail konnte nicht geöffnet werden:", error);
+          els.messageLoading.classList.add("hidden");
+          els.messageLoading.classList.remove("flex");
+          els.messageError.textContent = error.message || "Die Nachricht konnte nicht geladen werden. Bitte versuche es erneut.";
+          els.messageError.classList.remove("hidden");
+          els.messageContent.classList.remove("hidden");
+        }
+      }
+
+      function closeMessage() {
+        els.modal.classList.add("hidden");
+        els.modal.classList.remove("flex");
+        els.frame.srcdoc = "";
+        if (lastFocusedElement && typeof lastFocusedElement.focus === "function") {
+          lastFocusedElement.focus();
+        }
+      }
+
+      els.copy.addEventListener("click", async () => {
+        if (!account?.address) return;
+        const originalText = els.copy.textContent;
+
+        try {
+          if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(account.address);
+          } else {
+            const input = document.createElement("textarea");
+            input.value = account.address;
+            input.style.position = "fixed";
+            input.style.opacity = "0";
+            document.body.appendChild(input);
+            input.select();
+            const success = document.execCommand("copy");
+            input.remove();
+            if (!success) throw new Error("Kopieren wurde vom Browser blockiert.");
+          }
+
+          els.copy.textContent = "Kopiert ✓";
+          els.copy.classList.add("bg-emerald-600/20", "text-emerald-300");
+          setTimeout(() => {
+            els.copy.textContent = originalText;
+            els.copy.classList.remove("bg-emerald-600/20", "text-emerald-300");
+          }, 1800);
+        } catch (error) {
+          console.error("Kopieren fehlgeschlagen:", error);
+          els.copy.textContent = "Nicht möglich";
+          setTimeout(() => { els.copy.textContent = originalText; }, 1800);
+        }
+      });
+
+      els.new.addEventListener("click", () => {
+        if (creating) return;
+        createMailbox();
+      });
+
+      els.refresh.addEventListener("click", () => {
+        refreshInbox();
+      });
+
+      $("closeModal").addEventListener("click", closeMessage);
+
+      els.modal.addEventListener("click", event => {
+        if (event.target === els.modal) closeMessage();
+      });
+
+      document.addEventListener("keydown", event => {
+        if (event.key === "Escape" && !els.modal.classList.contains("hidden")) {
+          closeMessage();
+        }
+      });
+
+      // Initialisierung: echte Domain abrufen und echtes Konto erstellen.
+      createMailbox();
+    })();
+  </script>
+</body>
+</html>
